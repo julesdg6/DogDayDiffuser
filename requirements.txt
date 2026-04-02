@@ -1,0 +1,12 @@
+# Core dependencies
+opencv-python>=4.5.0
+numpy>=1.21.0
+
+# Optional: Audio reactivity
+# Uncomment for audio input support
+# sounddevice>=0.4.0
+# PyAudio>=0.2.11
+
+# Optional: OpenVINO for Intel NCS2 acceleration
+# Uncomment if using Intel Neural Compute Stick 2
+# openvino>=2022.1.0
