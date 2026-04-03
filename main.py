@@ -30,6 +30,7 @@ import sys
 from typing import Dict, Optional
 
 import cv2
+import numpy as np
 
 from config import parse_args, AppConfig, EFFECT_NAMES
 from camera import Camera
@@ -76,6 +77,7 @@ class DogDayDiffuser:
         self._audio_enabled: bool = cfg.audio
         self._face_enabled: bool = not cfg.no_face
         self._running: bool = False
+        self._dropped_frames: int = 0
 
         # Sub-systems (initialised in run())
         self._camera: Optional[Camera] = None
@@ -141,6 +143,41 @@ class DogDayDiffuser:
     # Main loop
     # ------------------------------------------------------------------
 
+    def _status_frame(self, message: str) -> np.ndarray:
+        """Build a simple status frame at internal resolution."""
+        frame = np.zeros((self.cfg.height, self.cfg.width, 3), dtype=np.uint8)
+        cv2.putText(
+            frame,
+            "DogDayDiffuser",
+            (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            frame,
+            message,
+            (10, 65),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            (0, 180, 255),
+            1,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            frame,
+            "Tip: verify camera cable/index and rpicam sees sensor",
+            (10, 90),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.35,
+            (180, 180, 180),
+            1,
+            cv2.LINE_AA,
+        )
+        return frame
+
     def run(self) -> None:
         """Open all resources and run the main processing loop."""
         logger.info("DogDayDiffuser starting up")
@@ -179,8 +216,24 @@ class DogDayDiffuser:
             # 1. Capture frame
             frame = self._camera.read()
             if frame is None:
+                self._dropped_frames += 1
                 logger.warning("Dropped frame from camera")
+
+                # Keep GUI alive with a visible diagnostic instead of black screen.
+                if self._renderer is not None and self._dropped_frames >= 1:
+                    status = self._status_frame("No camera frames received")
+                    fps = self._fps_counter.tick()
+                    self._renderer.show(
+                        status,
+                        fps=fps,
+                        effect_name="camera error",
+                        face=None,
+                    )
+                    key = self._renderer.poll_key()
+                    if not self._handle_key(key):
+                        break
                 continue
+            self._dropped_frames = 0
 
             # 2. Face detection (every N frames)
             if self._face_enabled and self._detector is not None:
@@ -209,7 +262,9 @@ class DogDayDiffuser:
             )
 
             # 6. Handle keyboard
-            key = cv2.waitKey(1) & 0xFF
+            key = -1
+            if self._renderer is not None:
+                key = self._renderer.poll_key()
             if not self._handle_key(key):
                 break
 
