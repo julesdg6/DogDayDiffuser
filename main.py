@@ -288,9 +288,113 @@ class DogDayDiffuser:
         self._running = True
 
         try:
-            self._loop()
+            self._show_splash()
+            if self._running:
+                self._loop()
         finally:
             self._cleanup()
+
+    # ------------------------------------------------------------------
+    # Splash screen
+    # ------------------------------------------------------------------
+
+    def _collect_hw_info(self) -> list:
+        """Build hardware detection rows for the splash console.
+
+        Called after all sub-systems have been initialised so that actual
+        device names and states can be reported accurately.
+        """
+        import platform as _platform
+        rows = []
+
+        # System
+        try:
+            rows.append(("OS", f"{_platform.system()} {_platform.release()}"[:42], "val"))
+        except Exception:
+            rows.append(("OS", "unknown", "warn"))
+        try:
+            cpu = (_platform.processor() or _platform.machine() or "unknown")[:42]
+            rows.append(("CPU", cpu, "val"))
+        except Exception:
+            rows.append(("CPU", "unknown", "warn"))
+
+        # Input source
+        if self._source_manager is not None:
+            rows.append(("Input", self._source_manager.source_name[:42], "ok"))
+        else:
+            rows.append(("Input", "not available", "err"))
+
+        # Face detection
+        if self._face_enabled and self._detector is not None:
+            det_type = type(self._detector).__name__
+            rows.append(("Face Det.", det_type, "ok"))
+        elif not self._face_enabled:
+            rows.append(("Face Det.", "disabled", "warn"))
+        else:
+            rows.append(("Face Det.", "init failed", "err"))
+
+        # Audio
+        if self._audio_enabled and self._audio_reactor is not None:
+            in_lbl = getattr(self._audio_reactor, "input_label", "active")
+            rows.append(("Audio IN", in_lbl[:42], "ok"))
+            out_lbl = getattr(self._audio_reactor, "output_label", "")
+            if out_lbl:
+                rows.append(("Audio OUT", out_lbl[:42], "ok"))
+        else:
+            rows.append(("Audio", "disabled", "warn"))
+
+        # MIDI
+        if self._midi_enabled and self._midi_manager is not None:
+            rows.append(("MIDI", self.cfg.midi_device[:42], "ok"))
+        else:
+            rows.append(("MIDI", "disabled", "warn"))
+
+        # OpenCV version
+        rows.append(("OpenCV", cv2.__version__, "val"))
+
+        # Starting effect
+        rows.append(("Effect", self._effect_name, "val"))
+
+        return rows
+
+    def _show_splash(self) -> None:
+        """Display the animated splash screen before the main loop.
+
+        Shows the King Charles Cavalier palette-animated fractal in the top
+        two thirds of the frame and a colourful hardware-detection console in
+        the bottom third.  Runs for ``SplashScreen.DURATION`` seconds then
+        returns automatically.  The user can skip with SPACE or quit with Q /
+        Esc (which also sets ``_running = False`` so the main loop is skipped).
+        """
+        from splash import SplashScreen
+
+        if self._renderer is None or self._renderer.is_headless:
+            # No display — just log and continue (no visual delay).
+            logger.info("Splash: headless mode, skipping visual splash")
+            return
+
+        hw_entries = self._collect_hw_info()
+        splash = SplashScreen(
+            width=self.cfg.width,
+            height=self.cfg.height,
+            hw_entries=hw_entries,
+        )
+
+        logger.info("Splash: starting (%.0f s)", SplashScreen.DURATION)
+        start = time.monotonic()
+        while self._running:
+            t = time.monotonic() - start
+            if t >= SplashScreen.DURATION:
+                break
+            frame = splash.render(t)
+            self._renderer.show(frame, fps=0.0, effect_name="")
+            key = self._renderer.poll_key()
+            if key in (ord("q"), 27):   # quit entirely
+                self._running = False
+                break
+            if key == ord(" "):         # skip to main loop
+                break
+        logger.info("Splash: done")
 
     def _loop(self) -> None:
         """Inner main loop."""
@@ -410,6 +514,7 @@ class DogDayDiffuser:
         if self._mode is not self._modes.get("milkdrop"):
             self._mode = self._modes["milkdrop"]
             logger.info("Switched to MilkDrop mode for preset cycling")
+
 
     def _handle_key(self, key: int) -> bool:
         """Process a keypress.  Returns False to signal quit."""
