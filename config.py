@@ -58,8 +58,26 @@ class AppConfig:
     # Config file path (not a runtime parameter)
     config: Optional[str] = None
 
+    # Visual mode (overrides effect when set)
+    default_mode: Optional[str] = None  # "geiss" | "milkdrop" | None
+
+    # MilkDrop-specific
+    milkdrop_auto_cycle: bool = True
+    milkdrop_cycle_seconds: float = 15.0
+    milkdrop_beat_transition: bool = True
+
+    # Geiss-specific
+    geiss_use_symmetry: bool = True
+    geiss_plasma_overlay: bool = True
+
+    # Shared mode settings
+    mode_allow_face_modulation: bool = True
+    mode_allow_audio_modulation: bool = True
+
 
 EFFECT_NAMES = ("kaleidoscope", "feedback", "warp", "color")
+
+MODE_NAMES = ("geiss", "milkdrop")
 
 
 def load_json_config(path: str) -> dict:
@@ -129,6 +147,29 @@ def parse_args(argv=None) -> AppConfig:
     parser.add_argument("--no-rescan", action="store_false", default=None,
                         dest="rescan_on_source_failure",
                         help="Disable automatic source fallback on read failure")
+    parser.add_argument("--mode", choices=MODE_NAMES, default=None,
+                        help="Start in a visual mode: geiss or milkdrop")
+    parser.add_argument("--no-milkdrop-auto-cycle", action="store_false", default=None,
+                        dest="milkdrop_auto_cycle",
+                        help="Disable automatic MilkDrop preset cycling")
+    parser.add_argument("--milkdrop-cycle-seconds", type=float, default=None,
+                        dest="milkdrop_cycle_seconds",
+                        help="Seconds between automatic MilkDrop preset changes")
+    parser.add_argument("--no-milkdrop-beat-transition", action="store_false",
+                        default=None, dest="milkdrop_beat_transition",
+                        help="Disable beat-triggered MilkDrop preset transitions")
+    parser.add_argument("--no-geiss-symmetry", action="store_false", default=None,
+                        dest="geiss_use_symmetry",
+                        help="Disable rotational symmetry in Geiss mode")
+    parser.add_argument("--no-geiss-plasma", action="store_false", default=None,
+                        dest="geiss_plasma_overlay",
+                        help="Disable plasma colour overlay in Geiss mode")
+    parser.add_argument("--no-face-modulation", action="store_false", default=None,
+                        dest="mode_allow_face_modulation",
+                        help="Disable face-driven modulation in visual modes")
+    parser.add_argument("--no-audio-modulation", action="store_false", default=None,
+                        dest="mode_allow_audio_modulation",
+                        help="Disable audio-driven modulation in visual modes")
 
     args = parser.parse_args(argv)
 
@@ -163,6 +204,14 @@ def parse_args(argv=None) -> AppConfig:
         "usb_video_loop": args.usb_video_loop,
         "usb_video_shuffle": args.usb_video_shuffle,
         "rescan_on_source_failure": args.rescan_on_source_failure,
+        "default_mode": args.mode,
+        "milkdrop_auto_cycle": args.milkdrop_auto_cycle,
+        "milkdrop_cycle_seconds": args.milkdrop_cycle_seconds,
+        "milkdrop_beat_transition": args.milkdrop_beat_transition,
+        "geiss_use_symmetry": args.geiss_use_symmetry,
+        "geiss_plasma_overlay": args.geiss_plasma_overlay,
+        "mode_allow_face_modulation": args.mode_allow_face_modulation,
+        "mode_allow_audio_modulation": args.mode_allow_audio_modulation,
     }
     for key, value in cli_map.items():
         if value is not None:
