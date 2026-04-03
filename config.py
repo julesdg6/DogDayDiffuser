@@ -43,6 +43,14 @@ class AppConfig:
     audio: bool = False
     audio_device: Optional[int] = None
 
+    # USB audio auto-detection and HDMI passthrough
+    audio_auto_usb: bool = True            # Auto-detect USB sound cards as input
+    audio_prefer_usb: bool = True          # Prefer USB over explicit device index
+    audio_output_prefer_hdmi: bool = True  # Prefer HDMI output for passthrough
+    audio_buffer_size: int = 512           # Buffer size in frames
+    audio_sample_rate: int = 44100         # Sampling rate in Hz
+    audio_enable_passthrough: bool = False  # Route input to HDMI output
+
     # Input source selection
     prefer_camera: bool = True
     usb_mount_roots: List[str] = field(
@@ -119,6 +127,24 @@ def parse_args(argv=None) -> AppConfig:
     parser.add_argument("--audio-device", type=int, default=None,
                         dest="audio_device",
                         help="Audio input device index (uses system default if omitted)")
+    parser.add_argument("--no-audio-auto-usb", action="store_false", default=None,
+                        dest="audio_auto_usb",
+                        help="Disable automatic USB sound card detection")
+    parser.add_argument("--no-audio-prefer-usb", action="store_false", default=None,
+                        dest="audio_prefer_usb",
+                        help="Do not prefer USB device over explicit --audio-device")
+    parser.add_argument("--no-audio-hdmi-out", action="store_false", default=None,
+                        dest="audio_output_prefer_hdmi",
+                        help="Disable automatic HDMI output selection for passthrough")
+    parser.add_argument("--audio-buffer-size", type=int, default=None,
+                        dest="audio_buffer_size",
+                        help="Audio buffer size in frames (default: 512)")
+    parser.add_argument("--audio-sample-rate", type=int, default=None,
+                        dest="audio_sample_rate",
+                        help="Audio sampling rate in Hz (default: 44100)")
+    parser.add_argument("--audio-passthrough", action="store_true", default=None,
+                        dest="audio_enable_passthrough",
+                        help="Route USB audio input to HDMI output in real time")
     parser.add_argument("--use-openvino", action="store_true", default=None,
                         dest="use_openvino",
                         help="Use Intel OpenVINO / NCS2 for face detection")
@@ -195,6 +221,12 @@ def parse_args(argv=None) -> AppConfig:
         "no_face": args.no_face,
         "audio": args.audio,
         "audio_device": args.audio_device,
+        "audio_auto_usb": args.audio_auto_usb,
+        "audio_prefer_usb": args.audio_prefer_usb,
+        "audio_output_prefer_hdmi": args.audio_output_prefer_hdmi,
+        "audio_buffer_size": args.audio_buffer_size,
+        "audio_sample_rate": args.audio_sample_rate,
+        "audio_enable_passthrough": args.audio_enable_passthrough,
         "use_openvino": args.use_openvino,
         "detection_interval": args.detection_interval,
         "config": args.config,

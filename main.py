@@ -161,8 +161,21 @@ class DogDayDiffuser:
         if not self._audio_enabled:
             return
         try:
-            from audio_reactivity import AudioReactor
-            self._audio_reactor = AudioReactor(device=self.cfg.audio_device)
+            from audio.audio_manager import AudioManager
+            self._audio_reactor = AudioManager(
+                audio_device=self.cfg.audio_device,
+                auto_usb=self.cfg.audio_auto_usb,
+                prefer_usb=self.cfg.audio_prefer_usb,
+                output_prefer_hdmi=self.cfg.audio_output_prefer_hdmi,
+                enable_passthrough=self.cfg.audio_enable_passthrough,
+                sample_rate=self.cfg.audio_sample_rate,
+                buffer_size=self.cfg.audio_buffer_size,
+            )
+            logger.info(
+                "Audio IN: %s | Audio OUT: %s",
+                self._audio_reactor.input_label,
+                self._audio_reactor.output_label,
+            )
         except Exception as exc:
             logger.warning(
                 "Audio reactivity unavailable: %s. Continuing without audio.", exc
