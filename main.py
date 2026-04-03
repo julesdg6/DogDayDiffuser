@@ -344,13 +344,10 @@ class DogDayDiffuser:
                 self._midi = self._midi_manager.get_state()
                 self._apply_midi_params(self._midi)
 
-            # 4. Apply effect
-            processed = self._current_effect.apply(
-                frame, face=self._face, audio=self._audio
-            # 4. Estimate inter-frame motion
+            # 5. Estimate inter-frame motion
             motion = self._estimate_motion(frame)
 
-            # 5. Build signals dict for visual modes
+            # 6. Build signals dict for visual modes
             h, w = frame.shape[:2]
             fps_now = self._fps_counter.fps
             signals = build_signals(
@@ -363,7 +360,7 @@ class DogDayDiffuser:
                 motion=motion,
             )
 
-            # 6. Apply visual mode or effect
+            # 7. Apply visual mode or effect
             if self._mode is not None:
                 self._mode.update(dt, signals)
                 processed = self._mode.render(frame, signals)
@@ -379,7 +376,7 @@ class DogDayDiffuser:
                 source_label = f"SOURCE: {self._source_manager.source_name}"
                 overlay_label = f"{self._current_effect.name} | {source_label}"
 
-            # 7. Render
+            # 8. Render
             fps = self._fps_counter.tick()
             self._renderer.show(
                 processed,
@@ -388,7 +385,7 @@ class DogDayDiffuser:
                 face=self._face,
             )
 
-            # 8. Handle keyboard
+            # 9. Handle keyboard
             key = -1
             if self._renderer is not None:
                 key = self._renderer.poll_key()
@@ -414,7 +411,7 @@ class DogDayDiffuser:
             self._mode = self._modes["milkdrop"]
             logger.info("Switched to MilkDrop mode for preset cycling")
 
-
+    def _handle_key(self, key: int) -> bool:
         """Process a keypress.  Returns False to signal quit."""
         if key in (ord("q"), 27):  # q or Esc
             logger.info("Quit requested")
