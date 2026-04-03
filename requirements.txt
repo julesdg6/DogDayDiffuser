@@ -11,3 +11,8 @@ pygame>=2.5.0
 # Optional: OpenVINO for Intel NCS2 acceleration
 # Uncomment if using Intel Neural Compute Stick 2
 # openvino>=2022.1.0
+
+# Optional: MIDI controller support (Korg nanoKONTROL2 and compatible)
+# Uncomment to enable --midi flag
+# mido>=1.3.0
+# python-rtmidi>=1.5.0
