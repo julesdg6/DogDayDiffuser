@@ -6,7 +6,7 @@ Startup sequence:
   2. Open webcam
   3. Initialise face detector (optional)
   4. Initialise audio reactor (optional)
-  5. Instantiate effect objects
+  5. Instantiate effect and mode objects
   6. Run main loop
   7. Clean up on exit
 
@@ -15,6 +15,12 @@ Keyboard shortcuts:
   f         — toggle fullscreen
   1–4       — select effect directly
   space     — cycle to next effect
+  g         — switch to Geiss mode
+  m         — switch to MilkDrop mode
+  e         — exit visual mode (return to effects)
+  [         — previous MilkDrop preset
+  ]         — next MilkDrop preset
+  r         — reset current mode
   a         — toggle audio reactivity
   d         — toggle face detection
   + / =     — increase trail strength
@@ -27,6 +33,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from typing import Dict, Optional
 
 import cv2
@@ -38,6 +45,9 @@ from face_detection import FaceInfo, build_detector
 from audio_reactivity import AudioFeatures
 from effects import EFFECTS, EFFECT_ORDER
 from effects.base import BaseEffect
+from modes import MODES, build_signals
+from modes.base_mode import VisualMode
+from modes.milkdrop_mode import MilkDropMode
 from renderer import Renderer
 from utils import FPSCounter, smooth
 
@@ -70,6 +80,14 @@ class DogDayDiffuser:
             name: cls() for name, cls in EFFECTS.items()
         }
 
+        # Active visual mode (None = use effects instead)
+        self._mode: Optional[VisualMode] = None
+        self._modes: Dict[str, VisualMode] = self._build_modes(cfg)
+        if cfg.default_mode and cfg.default_mode in self._modes:
+            self._mode = self._modes[cfg.default_mode]
+            self._mode.reset()
+            logger.info("Starting in visual mode: %s", cfg.default_mode)
+
         # State
         self._face: Optional[FaceInfo] = None
         self._face_frame_count: int = 0
@@ -78,6 +96,8 @@ class DogDayDiffuser:
         self._face_enabled: bool = not cfg.no_face
         self._running: bool = False
         self._dropped_frames: int = 0
+        self._last_frame_time: float = time.monotonic()
+        self._prev_gray: Optional[np.ndarray] = None   # for motion estimation
 
         # Sub-systems (initialised in run())
         self._source_manager: Optional[SourceManager] = None
@@ -85,6 +105,22 @@ class DogDayDiffuser:
         self._audio_reactor = None
         self._renderer: Optional[Renderer] = None
         self._fps_counter = FPSCounter()
+
+    @staticmethod
+    def _build_modes(cfg: AppConfig) -> Dict[str, VisualMode]:
+        """Instantiate all visual modes with config-driven parameters."""
+        geiss = MODES["geiss"](
+            use_symmetry=cfg.geiss_use_symmetry,
+            plasma_overlay=cfg.geiss_plasma_overlay,
+        )
+        milkdrop = MODES["milkdrop"](
+            auto_cycle=cfg.milkdrop_auto_cycle,
+            cycle_seconds=cfg.milkdrop_cycle_seconds,
+            beat_transition=cfg.milkdrop_beat_transition,
+            allow_face_modulation=cfg.mode_allow_face_modulation,
+            allow_audio_modulation=cfg.mode_allow_audio_modulation,
+        )
+        return {"geiss": geiss, "milkdrop": milkdrop}
 
     # ------------------------------------------------------------------
     # Property helpers
@@ -212,6 +248,11 @@ class DogDayDiffuser:
         frame_idx = 0
 
         while self._running:
+            # Track frame delta time
+            now = time.monotonic()
+            dt = now - self._last_frame_time
+            self._last_frame_time = now
+
             # 1. Capture frame
             ok, frame = self._source_manager.read()
             if not ok or frame is None:
@@ -249,22 +290,48 @@ class DogDayDiffuser:
             if self._audio_enabled and self._audio_reactor is not None:
                 self._audio = self._audio_reactor.get_features()
 
-            # 4. Apply effect
-            processed = self._current_effect.apply(
-                frame, face=self._face, audio=self._audio
+            # 4. Estimate inter-frame motion
+            motion = self._estimate_motion(frame)
+
+            # 5. Build signals dict for visual modes
+            h, w = frame.shape[:2]
+            fps_now = self._fps_counter.fps
+            signals = build_signals(
+                audio=self._audio,
+                face=self._face,
+                fps=fps_now,
+                source_name=self._source_manager.source_name,
+                frame_w=w,
+                frame_h=h,
+                motion=motion,
             )
 
-            # 5. Render
+            # 6. Apply visual mode or effect
+            if self._mode is not None:
+                self._mode.update(dt, signals)
+                processed = self._mode.render(frame, signals)
+                overlay_label = f"{self._mode.name}"
+                if hasattr(self._mode, "subtitle") and self._mode.subtitle:
+                    overlay_label += f" / {self._mode.subtitle}"
+                source_label = f"SOURCE: {self._source_manager.source_name}"
+                overlay_label += f" | {source_label}"
+            else:
+                processed = self._current_effect.apply(
+                    frame, face=self._face, audio=self._audio
+                )
+                source_label = f"SOURCE: {self._source_manager.source_name}"
+                overlay_label = f"{self._current_effect.name} | {source_label}"
+
+            # 7. Render
             fps = self._fps_counter.tick()
-            source_label = f"SOURCE: {self._source_manager.source_name}"
             self._renderer.show(
                 processed,
                 fps=fps,
-                effect_name=f"{self._current_effect.name} | {source_label}",
+                effect_name=overlay_label,
                 face=self._face,
             )
 
-            # 6. Handle keyboard
+            # 8. Handle keyboard
             key = -1
             if self._renderer is not None:
                 key = self._renderer.poll_key()
@@ -273,7 +340,24 @@ class DogDayDiffuser:
 
             frame_idx += 1
 
-    def _handle_key(self, key: int) -> bool:
+    def _estimate_motion(self, frame: np.ndarray) -> float:
+        """Return normalised inter-frame motion magnitude 0–1."""
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        if self._prev_gray is None or self._prev_gray.shape != gray.shape:
+            self._prev_gray = gray
+            return 0.0
+        diff = cv2.absdiff(gray, self._prev_gray)
+        self._prev_gray = gray
+        motion = float(np.mean(diff)) / 255.0
+        return min(motion * 6.0, 1.0)  # scale up for typical scenes
+
+    def _ensure_milkdrop_mode(self) -> None:
+        """Switch to MilkDrop mode if not already active."""
+        if self._mode is not self._modes.get("milkdrop"):
+            self._mode = self._modes["milkdrop"]
+            logger.info("Switched to MilkDrop mode for preset cycling")
+
+
         """Process a keypress.  Returns False to signal quit."""
         if key in (ord("q"), 27):  # q or Esc
             logger.info("Quit requested")
@@ -287,15 +371,52 @@ class DogDayDiffuser:
 
         elif key == ord("1"):
             self._effect_name = "kaleidoscope"
+            self._mode = None
 
         elif key == ord("2"):
             self._effect_name = "feedback"
+            self._mode = None
 
         elif key == ord("3"):
             self._effect_name = "warp"
+            self._mode = None
 
         elif key == ord("4"):
             self._effect_name = "color"
+            self._mode = None
+
+        elif key == ord("g"):
+            self._mode = self._modes["geiss"]
+            self._mode.reset()
+            logger.info("Visual mode → GEISS")
+
+        elif key == ord("m"):
+            self._mode = self._modes["milkdrop"]
+            self._mode.reset()
+            logger.info("Visual mode → MILKDROP")
+
+        elif key == ord("e"):
+            self._mode = None
+            logger.info("Visual mode → OFF (effect: %s)", self._effect_name)
+
+        elif key == ord("r"):
+            if self._mode is not None:
+                self._mode.reset()
+                logger.info("Mode reset: %s", self._mode.name)
+
+        elif key == ord("]"):
+            md = self._modes.get("milkdrop")
+            if md is not None and isinstance(md, MilkDropMode):
+                md.cycle_preset(direction=1)
+                logger.info("MilkDrop preset → next")
+            self._ensure_milkdrop_mode()
+
+        elif key == ord("["):
+            md = self._modes.get("milkdrop")
+            if md is not None and isinstance(md, MilkDropMode):
+                md.cycle_preset(direction=-1)
+                logger.info("MilkDrop preset → previous")
+            self._ensure_milkdrop_mode()
 
         elif key == ord("a"):
             if self._audio_reactor is not None:
