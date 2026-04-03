@@ -10,8 +10,21 @@ constrained hardware.
 
 ---
 
+## Splash screen
+
+On startup the app shows a 10-second animated splash screen before entering the main effects loop.
+
+![DogDayDiffuser splash screen — King Charles Cavalier fractal (top 2/3) and hardware detection console (bottom 1/3)](https://github.com/user-attachments/assets/3d04388a-bc39-4320-9e3a-18bb683a85df)
+
+- **Top 2/3 — animated fractal:** A Julia set rendered in a warm King Charles Cavalier colour palette (dark mahogany → ruby-red → chestnut → caramel tan → cream white), animated by palette cycling.
+- **Bottom 1/3 — hardware console:** OS, CPU, camera, face detector, audio, MIDI and OpenCV version, revealed row-by-row with a countdown progress bar.
+- Press **Space** to skip to the main loop or **Q / Esc** to quit.
+
+---
+
 ## Features
 
+- Animated startup splash screen with King Charles Cavalier fractal and hardware detection console
 - Live webcam capture with configurable resolution
 - Kaleidoscope / mirrored symmetry effect
 - Zoom feedback / recursive trails
@@ -29,6 +42,7 @@ constrained hardware.
 ```
 DogDayDiffuser/
 ├── main.py              # App entry point, main loop
+├── splash.py            # Animated startup splash screen
 ├── camera.py            # Webcam capture abstraction
 ├── face_detection.py    # Face detector interface (OpenCV + OpenVINO)
 ├── audio_reactivity.py  # Audio capture and FFT-based feature extraction
@@ -156,7 +170,8 @@ python main.py --config my_settings.json
 
 | Key | Action |
 |-----|--------|
-| `q` / `Esc` | Quit |
+| `q` / `Esc` | Quit (also skips splash immediately) |
+| `space` | Skip splash screen / cycle to next effect |
 | `f` | Toggle fullscreen |
 | `1` | Kaleidoscope effect |
 | `2` | Feedback trails |
@@ -166,7 +181,6 @@ python main.py --config my_settings.json
 | `d` | Toggle face detection |
 | `+` / `-` | Increase / decrease trail strength |
 | `w` / `s` | Increase / decrease warp amount |
-| `space` | Cycle to next effect |
 
 ---
 
@@ -219,9 +233,10 @@ affecting the others.
 - [ ] Phase 2: face detection + parameter mapping ✅
 - [ ] Phase 3: feedback trails + warp ✅
 - [ ] Phase 4: audio reactivity ✅
-- [ ] Phase 5: Raspberry Pi optimisation and tuning
-- [ ] Phase 6: recording / output mode
-- [ ] Phase 7: facial landmarks for precise warp targeting
+- [ ] Phase 5: animated splash screen ✅
+- [ ] Phase 6: Raspberry Pi optimisation and tuning
+- [ ] Phase 7: recording / output mode
+- [ ] Phase 8: facial landmarks for precise warp targeting
 
 ---
 
