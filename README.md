@@ -14,7 +14,7 @@ constrained hardware.
 
 On startup the app shows a 10-second animated splash screen before entering the main effects loop.
 
-![DogDayDiffuser splash screen — King Charles Cavalier fractal (top 2/3) and hardware detection console (bottom 1/3)](https://github.com/user-attachments/assets/3d04388a-bc39-4320-9e3a-18bb683a85df)
+![DogDayDiffuser splash screen — fractal (top 2/3) and hardware detection console (bottom 1/3)](docs/splash_screen.png)
 
 - **Top 2/3 — animated fractal:** A Julia set rendered in a warm King Charles Cavalier colour palette (dark mahogany → ruby-red → chestnut → caramel tan → cream white), animated by palette cycling.
 - **Bottom 1/3 — hardware console:** OS, CPU, camera, face detector, audio, MIDI and OpenCV version, revealed row-by-row with a countdown progress bar.

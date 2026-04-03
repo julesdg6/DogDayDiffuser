@@ -258,11 +258,6 @@ class SplashScreen:
             (6, 20), cv2.FONT_HERSHEY_SIMPLEX,
             0.55, (255, 255, 255), 2, cv2.LINE_AA,
         )
-        cv2.putText(
-            panel, "King Charles Cavalier",
-            (6, 38), cv2.FONT_HERSHEY_SIMPLEX,
-            0.35, (220, 235, 255), 1, cv2.LINE_AA,
-        )
         return panel
 
     # ------------------------------------------------------------------
