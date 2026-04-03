@@ -55,6 +55,11 @@ class AppConfig:
     usb_video_shuffle: bool = False
     rescan_on_source_failure: bool = True
 
+    # MIDI controller
+    midi_enabled: bool = False
+    midi_device: str = "nanoKONTROL2"
+    mapping_profile: str = "default_vj"
+
     # Config file path (not a runtime parameter)
     config: Optional[str] = None
 
@@ -147,6 +152,16 @@ def parse_args(argv=None) -> AppConfig:
     parser.add_argument("--no-rescan", action="store_false", default=None,
                         dest="rescan_on_source_failure",
                         help="Disable automatic source fallback on read failure")
+    parser.add_argument("--midi", action="store_true", default=None,
+                        dest="midi_enabled",
+                        help="Enable Korg nanoKONTROL2 MIDI input")
+    parser.add_argument("--midi-device", type=str, default=None,
+                        dest="midi_device",
+                        help="MIDI device name substring to auto-detect "
+                             "(default: nanoKONTROL2)")
+    parser.add_argument("--mapping-profile", type=str, default=None,
+                        dest="mapping_profile",
+                        help="MIDI mapping profile name (default: default_vj)")
     parser.add_argument("--mode", choices=MODE_NAMES, default=None,
                         help="Start in a visual mode: geiss or milkdrop")
     parser.add_argument("--no-milkdrop-auto-cycle", action="store_false", default=None,
@@ -204,6 +219,9 @@ def parse_args(argv=None) -> AppConfig:
         "usb_video_loop": args.usb_video_loop,
         "usb_video_shuffle": args.usb_video_shuffle,
         "rescan_on_source_failure": args.rescan_on_source_failure,
+        "midi_enabled": args.midi_enabled,
+        "midi_device": args.midi_device,
+        "mapping_profile": args.mapping_profile,
         "default_mode": args.mode,
         "milkdrop_auto_cycle": args.milkdrop_auto_cycle,
         "milkdrop_cycle_seconds": args.milkdrop_cycle_seconds,

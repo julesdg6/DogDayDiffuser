@@ -50,6 +50,7 @@ from modes.base_mode import VisualMode
 from modes.milkdrop_mode import MilkDropMode
 from renderer import Renderer
 from utils import FPSCounter, smooth
+from midi.mapping import MidiState
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -92,8 +93,10 @@ class DogDayDiffuser:
         self._face: Optional[FaceInfo] = None
         self._face_frame_count: int = 0
         self._audio: Optional[AudioFeatures] = None
+        self._midi: Optional[MidiState] = None
         self._audio_enabled: bool = cfg.audio
         self._face_enabled: bool = not cfg.no_face
+        self._midi_enabled: bool = cfg.midi_enabled
         self._running: bool = False
         self._dropped_frames: int = 0
         self._last_frame_time: float = time.monotonic()
@@ -103,6 +106,7 @@ class DogDayDiffuser:
         self._source_manager: Optional[SourceManager] = None
         self._detector = None
         self._audio_reactor = None
+        self._midi_manager = None
         self._renderer: Optional[Renderer] = None
         self._fps_counter = FPSCounter()
 
@@ -134,6 +138,13 @@ class DogDayDiffuser:
         idx = EFFECT_ORDER.index(self._effect_name)
         self._effect_name = EFFECT_ORDER[(idx + 1) % len(EFFECT_ORDER)]
         logger.info("Effect → %s", self._effect_name)
+
+    def _apply_midi_params(self, state: MidiState) -> None:
+        """Apply MIDI-controlled parameters to all loaded effects."""
+        for effect in self._effects.values():
+            effect.strength = state.master_intensity
+            effect.warp_amount = state.warp_amount
+            effect.trail_decay = state.feedback_decay
 
     # ------------------------------------------------------------------
     # Initialisation helpers
@@ -172,6 +183,29 @@ class DogDayDiffuser:
 
     def _init_renderer(self) -> None:
         self._renderer = Renderer(fullscreen=self.cfg.fullscreen)
+
+    def _init_midi(self) -> None:
+        if not self._midi_enabled:
+            return
+        try:
+            from midi import MidiManager
+            self._midi_manager = MidiManager(device_name=self.cfg.midi_device)
+            self._midi_manager.open()
+            logger.info("MIDI controller connected: %s", self.cfg.midi_device)
+        except ImportError:
+            logger.warning(
+                "mido / python-rtmidi not installed. "
+                "Install with: pip install mido python-rtmidi. "
+                "Continuing without MIDI."
+            )
+            self._midi_enabled = False
+            self._midi_manager = None
+        except RuntimeError as exc:
+            logger.warning(
+                "MIDI unavailable: %s. Continuing without MIDI.", exc
+            )
+            self._midi_enabled = False
+            self._midi_manager = None
 
     # ------------------------------------------------------------------
     # Main loop
@@ -228,12 +262,14 @@ class DogDayDiffuser:
 
         self._init_face_detector()
         self._init_audio()
+        self._init_midi()
         self._init_renderer()
 
         logger.info(
-            "Face detection: %s | Audio: %s",
+            "Face detection: %s | Audio: %s | MIDI: %s",
             "ON" if self._face_enabled else "OFF",
             "ON" if self._audio_enabled else "OFF",
+            "ON" if self._midi_enabled else "OFF",
         )
 
         self._running = True
@@ -290,6 +326,14 @@ class DogDayDiffuser:
             if self._audio_enabled and self._audio_reactor is not None:
                 self._audio = self._audio_reactor.get_features()
 
+            # 4. MIDI parameter state
+            if self._midi_enabled and self._midi_manager is not None:
+                self._midi = self._midi_manager.get_state()
+                self._apply_midi_params(self._midi)
+
+            # 4. Apply effect
+            processed = self._current_effect.apply(
+                frame, face=self._face, audio=self._audio
             # 4. Estimate inter-frame motion
             motion = self._estimate_motion(frame)
 
@@ -463,6 +507,8 @@ class DogDayDiffuser:
             self._source_manager.release()
         if self._audio_reactor:
             self._audio_reactor.close()
+        if self._midi_manager:
+            self._midi_manager.close()
         if self._detector:
             self._detector.close()
         if self._renderer:
