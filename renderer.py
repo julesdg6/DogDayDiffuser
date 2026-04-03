@@ -10,6 +10,7 @@ Handles:
 
 import logging
 import os
+import platform
 import re
 import subprocess
 from typing import Optional
@@ -49,8 +50,9 @@ class Renderer:
         self._pygame = None
         self._pg_screen = None
 
-        # On Linux servers/containers there may be no display available.
-        if os.name != "nt" and not (
+        # On Linux servers/containers there may be no display available. On macOS
+        # and Windows, GUI apps do not use DISPLAY/WAYLAND env vars.
+        if platform.system() == "Linux" and not (
             os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
         ):
             self._headless = True
@@ -63,7 +65,14 @@ class Renderer:
             return
 
         # Fallback to OpenCV window backend.
-        cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+        try:
+            cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+        except Exception as exc:
+            self._headless = True
+            logger.warning(
+                "Renderer could not create a GUI window (%s); running headless", exc
+            )
+            return
         self._screen_size = self._detect_screen_size()
         if fullscreen:
             cv2.setWindowProperty(
@@ -152,6 +161,8 @@ class Renderer:
                 self._pygame.K_2: ord("2"),
                 self._pygame.K_3: ord("3"),
                 self._pygame.K_4: ord("4"),
+                self._pygame.K_5: ord("5"),
+                self._pygame.K_6: ord("6"),
                 self._pygame.K_g: ord("g"),
                 self._pygame.K_m: ord("m"),
                 self._pygame.K_e: ord("e"),

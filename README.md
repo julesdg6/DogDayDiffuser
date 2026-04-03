@@ -177,6 +177,11 @@ python main.py --config my_settings.json
 | `2` | Feedback trails |
 | `3` | Face warp |
 | `4` | Colour FX |
+| `5` | Geiss mode |
+| `6` | MilkDrop mode |
+| `e` | Exit visual mode (back to effects) |
+| `r` | Reset current mode |
+| `[` / `]` | Previous / next MilkDrop preset |
 | `a` | Toggle audio reactivity |
 | `d` | Toggle face detection |
 | `+` / `-` | Increase / decrease trail strength |

@@ -14,6 +14,8 @@ Keyboard shortcuts:
   q / Esc   — quit
   f         — toggle fullscreen
   1–4       — select effect directly
+  5         — switch to Geiss mode
+  6         — switch to MilkDrop mode
   space     — cycle to next effect
   g         — switch to Geiss mode
   m         — switch to MilkDrop mode
@@ -543,6 +545,16 @@ class DogDayDiffuser:
         elif key == ord("4"):
             self._effect_name = "color"
             self._mode = None
+
+        elif key == ord("5"):
+            self._mode = self._modes["geiss"]
+            self._mode.reset()
+            logger.info("Visual mode → GEISS")
+
+        elif key == ord("6"):
+            self._mode = self._modes["milkdrop"]
+            self._mode.reset()
+            logger.info("Visual mode → MILKDROP")
 
         elif key == ord("g"):
             self._mode = self._modes["geiss"]
