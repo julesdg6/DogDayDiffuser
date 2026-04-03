@@ -296,28 +296,36 @@ class TestMidiManagerDeviceDetection:
     def test_find_device_returns_matching_port(self) -> None:
         from midi.midi_manager import MidiManager
         mgr = MidiManager(device_name="nanoKONTROL2")
-        with patch("mido.get_input_names", return_value=["nanoKONTROL2 MIDI 1"]):
+        mock_mido = MagicMock()
+        mock_mido.get_input_names.return_value = ["nanoKONTROL2 MIDI 1"]
+        with patch.dict("sys.modules", {"mido": mock_mido}):
             port = mgr.find_device()
         assert port == "nanoKONTROL2 MIDI 1"
 
     def test_find_device_case_insensitive(self) -> None:
         from midi.midi_manager import MidiManager
         mgr = MidiManager(device_name="nanokontrol2")
-        with patch("mido.get_input_names", return_value=["nanoKONTROL2 MIDI 1"]):
+        mock_mido = MagicMock()
+        mock_mido.get_input_names.return_value = ["nanoKONTROL2 MIDI 1"]
+        with patch.dict("sys.modules", {"mido": mock_mido}):
             port = mgr.find_device()
         assert port is not None
 
     def test_find_device_returns_none_when_absent(self) -> None:
         from midi.midi_manager import MidiManager
         mgr = MidiManager(device_name="nanoKONTROL2")
-        with patch("mido.get_input_names", return_value=["Some Other Device"]):
+        mock_mido = MagicMock()
+        mock_mido.get_input_names.return_value = ["Some Other Device"]
+        with patch.dict("sys.modules", {"mido": mock_mido}):
             port = mgr.find_device()
         assert port is None
 
     def test_list_ports_delegates_to_mido(self) -> None:
         from midi.midi_manager import MidiManager
         expected = ["Port A", "Port B"]
-        with patch("mido.get_input_names", return_value=expected):
+        mock_mido = MagicMock()
+        mock_mido.get_input_names.return_value = expected
+        with patch.dict("sys.modules", {"mido": mock_mido}):
             ports = MidiManager.list_ports()
         assert ports == expected
 
@@ -326,8 +334,10 @@ class TestMidiManagerOpenClose:
     def test_open_raises_when_no_device_found(self) -> None:
         from midi.midi_manager import MidiManager
         mgr = MidiManager()
+        mock_mido = MagicMock()
+        mock_mido.get_input_names.return_value = []
         with (
-            patch("mido.get_input_names", return_value=[]),
+            patch.dict("sys.modules", {"mido": mock_mido}),
             pytest.raises(RuntimeError, match="No MIDI device"),
         ):
             mgr.open()
@@ -343,10 +353,11 @@ class TestMidiManagerOpenClose:
         # close() unblocks the reader loop via _running = False; mock it
         mock_port.close = MagicMock()
 
-        with (
-            patch("mido.get_input_names", return_value=["nanoKONTROL2 MIDI 1"]),
-            patch("mido.open_input", return_value=mock_port),
-        ):
+        mock_mido = MagicMock()
+        mock_mido.get_input_names.return_value = ["nanoKONTROL2 MIDI 1"]
+        mock_mido.open_input.return_value = mock_port
+
+        with patch.dict("sys.modules", {"mido": mock_mido}):
             mgr = MidiManager()
             mgr.open()
             # Thread may finish quickly (empty iterator), but port was opened
