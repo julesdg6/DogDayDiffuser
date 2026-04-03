@@ -12,7 +12,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,18 @@ class AppConfig:
     # Audio reactivity
     audio: bool = False
     audio_device: Optional[int] = None
+
+    # Input source selection
+    prefer_camera: bool = True
+    usb_mount_roots: List[str] = field(
+        default_factory=lambda: ["/media", "/mnt", "/run/media"]
+    )
+    video_extensions: List[str] = field(
+        default_factory=lambda: [".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"]
+    )
+    usb_video_loop: bool = True
+    usb_video_shuffle: bool = False
+    rescan_on_source_failure: bool = True
 
     # Config file path (not a runtime parameter)
     config: Optional[str] = None
@@ -97,6 +109,26 @@ def parse_args(argv=None) -> AppConfig:
                         help="Run face detection every N frames")
     parser.add_argument("--config", type=str, default=None,
                         help="Path to a JSON settings file")
+    parser.add_argument("--no-prefer-camera", action="store_false", default=None,
+                        dest="prefer_camera",
+                        help="Skip webcam and go straight to USB video scan")
+    parser.add_argument("--usb-mount-roots", type=str, nargs="+", default=None,
+                        dest="usb_mount_roots",
+                        help="Directories to scan for USB video files "
+                             "(default: /media /mnt /run/media)")
+    parser.add_argument("--video-extensions", type=str, nargs="+", default=None,
+                        dest="video_extensions",
+                        help="Supported video file extensions "
+                             "(default: .mp4 .mov .avi .mkv .webm .m4v)")
+    parser.add_argument("--no-usb-loop", action="store_false", default=None,
+                        dest="usb_video_loop",
+                        help="Do not loop USB video files when playback ends")
+    parser.add_argument("--usb-shuffle", action="store_true", default=None,
+                        dest="usb_video_shuffle",
+                        help="Shuffle the USB video playlist")
+    parser.add_argument("--no-rescan", action="store_false", default=None,
+                        dest="rescan_on_source_failure",
+                        help="Disable automatic source fallback on read failure")
 
     args = parser.parse_args(argv)
 
@@ -125,6 +157,12 @@ def parse_args(argv=None) -> AppConfig:
         "use_openvino": args.use_openvino,
         "detection_interval": args.detection_interval,
         "config": args.config,
+        "prefer_camera": args.prefer_camera,
+        "usb_mount_roots": args.usb_mount_roots,
+        "video_extensions": args.video_extensions,
+        "usb_video_loop": args.usb_video_loop,
+        "usb_video_shuffle": args.usb_video_shuffle,
+        "rescan_on_source_failure": args.rescan_on_source_failure,
     }
     for key, value in cli_map.items():
         if value is not None:

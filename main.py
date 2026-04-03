@@ -33,7 +33,7 @@ import cv2
 import numpy as np
 
 from config import parse_args, AppConfig, EFFECT_NAMES
-from camera import Camera
+from input import SourceManager
 from face_detection import FaceInfo, build_detector
 from audio_reactivity import AudioFeatures
 from effects import EFFECTS, EFFECT_ORDER
@@ -80,7 +80,7 @@ class DogDayDiffuser:
         self._dropped_frames: int = 0
 
         # Sub-systems (initialised in run())
-        self._camera: Optional[Camera] = None
+        self._source_manager: Optional[SourceManager] = None
         self._detector = None
         self._audio_reactor = None
         self._renderer: Optional[Renderer] = None
@@ -103,13 +103,11 @@ class DogDayDiffuser:
     # Initialisation helpers
     # ------------------------------------------------------------------
 
-    def _init_camera(self) -> None:
-        self._camera = Camera(
-            index=self.cfg.camera,
-            width=self.cfg.width,
-            height=self.cfg.height,
-        )
-        self._camera.open()
+    def _init_source(self) -> None:
+        self._source_manager = SourceManager(self.cfg)
+        if not self._source_manager.initialize():
+            raise RuntimeError("No valid input source available. "
+                               "Connect a webcam or insert a USB drive with video files.")
 
     def _init_face_detector(self) -> None:
         if not self._face_enabled:
@@ -181,12 +179,13 @@ class DogDayDiffuser:
     def run(self) -> None:
         """Open all resources and run the main processing loop."""
         logger.info("DogDayDiffuser starting up")
-        logger.info("Config: camera=%d, resolution=%dx%d, effect=%s",
-                    self.cfg.camera, self.cfg.width, self.cfg.height, self.cfg.effect)
+        logger.info("Config: resolution=%dx%d, effect=%s, prefer_camera=%s",
+                    self.cfg.width, self.cfg.height, self.cfg.effect,
+                    self.cfg.prefer_camera)
 
         # Initialise sub-systems
         try:
-            self._init_camera()
+            self._init_source()
         except RuntimeError as exc:
             logger.error("%s", exc)
             sys.exit(1)
@@ -214,19 +213,22 @@ class DogDayDiffuser:
 
         while self._running:
             # 1. Capture frame
-            frame = self._camera.read()
-            if frame is None:
+            ok, frame = self._source_manager.read()
+            if not ok or frame is None:
                 self._dropped_frames += 1
-                logger.warning("Dropped frame from camera")
+                logger.warning("Dropped frame from source: %s",
+                               self._source_manager.source_name)
 
                 # Keep GUI alive with a visible diagnostic instead of black screen.
                 if self._renderer is not None and self._dropped_frames >= 1:
-                    status = self._status_frame("No camera frames received")
+                    status = self._status_frame(
+                        f"No frames — SOURCE: {self._source_manager.source_name}"
+                    )
                     fps = self._fps_counter.tick()
                     self._renderer.show(
                         status,
                         fps=fps,
-                        effect_name="camera error",
+                        effect_name="source error",
                         face=None,
                     )
                     key = self._renderer.poll_key()
@@ -254,10 +256,11 @@ class DogDayDiffuser:
 
             # 5. Render
             fps = self._fps_counter.tick()
+            source_label = f"SOURCE: {self._source_manager.source_name}"
             self._renderer.show(
                 processed,
                 fps=fps,
-                effect_name=self._current_effect.name,
+                effect_name=f"{self._current_effect.name} | {source_label}",
                 face=self._face,
             )
 
@@ -335,8 +338,8 @@ class DogDayDiffuser:
 
     def _cleanup(self) -> None:
         logger.info("Shutting down…")
-        if self._camera:
-            self._camera.release()
+        if self._source_manager:
+            self._source_manager.release()
         if self._audio_reactor:
             self._audio_reactor.close()
         if self._detector:
