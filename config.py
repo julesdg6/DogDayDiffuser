@@ -72,7 +72,7 @@ class AppConfig:
     config: Optional[str] = None
 
     # Visual mode (overrides effect when set)
-    default_mode: Optional[str] = None  # "geiss" | "milkdrop" | None
+    default_mode: Optional[str] = None  # "geiss" | "milkdrop" | "audio_tunnel" | None
 
     # MilkDrop-specific
     milkdrop_auto_cycle: bool = True
@@ -83,6 +83,13 @@ class AppConfig:
     geiss_use_symmetry: bool = True
     geiss_plasma_overlay: bool = True
 
+    # AudioTunnel-specific
+    tunnel_speed: float = 1.5
+    tunnel_obstacle_density: float = 1.0
+    tunnel_lane_count: int = 3
+    tunnel_audio_sensitivity: float = 1.0
+    tunnel_glow_strength: float = 0.5
+
     # Shared mode settings
     mode_allow_face_modulation: bool = True
     mode_allow_audio_modulation: bool = True
@@ -90,7 +97,7 @@ class AppConfig:
 
 EFFECT_NAMES = ("kaleidoscope", "feedback", "warp", "color")
 
-MODE_NAMES = ("geiss", "milkdrop")
+MODE_NAMES = ("geiss", "milkdrop", "audio_tunnel")
 
 
 def load_json_config(path: str) -> dict:
@@ -205,6 +212,21 @@ def parse_args(argv=None) -> AppConfig:
     parser.add_argument("--no-geiss-plasma", action="store_false", default=None,
                         dest="geiss_plasma_overlay",
                         help="Disable plasma colour overlay in Geiss mode")
+    parser.add_argument("--tunnel-speed", type=float, default=None,
+                        dest="tunnel_speed",
+                        help="Audio Tunnel base scroll speed (default: 1.5)")
+    parser.add_argument("--tunnel-obstacle-density", type=float, default=None,
+                        dest="tunnel_obstacle_density",
+                        help="Audio Tunnel obstacle spawn rate multiplier (default: 1.0)")
+    parser.add_argument("--tunnel-lane-count", type=int, default=None,
+                        dest="tunnel_lane_count",
+                        help="Audio Tunnel number of obstacle lanes (default: 3)")
+    parser.add_argument("--tunnel-audio-sensitivity", type=float, default=None,
+                        dest="tunnel_audio_sensitivity",
+                        help="Audio Tunnel sensitivity multiplier (default: 1.0)")
+    parser.add_argument("--tunnel-glow-strength", type=float, default=None,
+                        dest="tunnel_glow_strength",
+                        help="Audio Tunnel glow intensity 0-1 (default: 0.5)")
     parser.add_argument("--no-face-modulation", action="store_false", default=None,
                         dest="mode_allow_face_modulation",
                         help="Disable face-driven modulation in visual modes")
@@ -260,6 +282,11 @@ def parse_args(argv=None) -> AppConfig:
         "milkdrop_beat_transition": args.milkdrop_beat_transition,
         "geiss_use_symmetry": args.geiss_use_symmetry,
         "geiss_plasma_overlay": args.geiss_plasma_overlay,
+        "tunnel_speed": args.tunnel_speed,
+        "tunnel_obstacle_density": args.tunnel_obstacle_density,
+        "tunnel_lane_count": args.tunnel_lane_count,
+        "tunnel_audio_sensitivity": args.tunnel_audio_sensitivity,
+        "tunnel_glow_strength": args.tunnel_glow_strength,
         "mode_allow_face_modulation": args.mode_allow_face_modulation,
         "mode_allow_audio_modulation": args.mode_allow_audio_modulation,
     }

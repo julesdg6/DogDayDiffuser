@@ -65,10 +65,15 @@ class TestModeRegistry:
         assert "geiss" in MODES
         assert "milkdrop" in MODES
 
+    def test_modes_dict_contains_audio_tunnel(self) -> None:
+        from modes import MODES
+        assert "audio_tunnel" in MODES
+
     def test_mode_names_list(self) -> None:
         from modes import MODE_NAMES
         assert "geiss" in MODE_NAMES
         assert "milkdrop" in MODE_NAMES
+        assert "audio_tunnel" in MODE_NAMES
 
     def test_preset_names_list(self) -> None:
         from modes import PRESET_NAMES
@@ -419,6 +424,134 @@ class TestPaletteHelpers:
 
 
 # ---------------------------------------------------------------------------
+# AudioTunnelMode
+# ---------------------------------------------------------------------------
+
+
+class TestAudioTunnelMode:
+    def test_render_returns_same_shape(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        mode = AudioTunnelMode()
+        frame = _blank_frame()
+        out = mode.render(frame, _empty_signals())
+        assert out.shape == frame.shape
+        assert out.dtype == np.uint8
+
+    def test_render_multiple_frames_stable(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        mode = AudioTunnelMode()
+        frame = _noise_frame()
+        for _ in range(5):
+            out = mode.render(frame, _empty_signals())
+        assert out.shape == frame.shape
+        assert out.dtype == np.uint8
+
+    def test_reset_clears_state(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        mode = AudioTunnelMode()
+        frame = _blank_frame()
+        mode.render(frame, _empty_signals())
+        assert mode._canvas is not None
+        mode.reset()
+        assert mode._canvas is None
+        assert mode._blocks == []
+        assert mode._sparkles == []
+        assert mode._time == 0.0
+
+    def test_update_advances_time(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        mode = AudioTunnelMode()
+        mode.update(1.0 / 30.0, _empty_signals())
+        assert mode._time > 0.0
+
+    def test_audio_signals_do_not_crash(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        mode = AudioTunnelMode()
+        frame = _noise_frame()
+        sig = _audio_signals(audio_bass=1.0, audio_mid=1.0,
+                             audio_treble=1.0, beat_pulse=1.0,
+                             audio_level=1.0)
+        out = mode.render(frame, sig)
+        assert out.shape == frame.shape
+
+    def test_beat_pulse_triggers_flash(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        mode = AudioTunnelMode()
+        sig = _audio_signals(beat_pulse=1.0)
+        mode.update(1.0 / 30.0, sig)
+        assert mode._flash > 0.0
+
+    def test_blocks_spawned_with_audio(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        mode = AudioTunnelMode(obstacle_density=2.0)
+        sig = _audio_signals(audio_bass=1.0, audio_mid=1.0,
+                             audio_treble=1.0, beat_pulse=1.0)
+        # Run many updates to ensure blocks are spawned
+        for _ in range(60):
+            mode.update(1.0 / 30.0, sig)
+        assert len(mode._blocks) > 0
+
+    def test_block_count_capped(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode, _MAX_BLOCKS
+        mode = AudioTunnelMode(obstacle_density=5.0)
+        sig = _audio_signals(audio_bass=1.0, audio_mid=1.0,
+                             audio_treble=1.0, beat_pulse=1.0)
+        for _ in range(300):
+            mode.update(1.0 / 30.0, sig)
+        assert len(mode._blocks) <= _MAX_BLOCKS
+
+    def test_non_standard_resolution(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        mode = AudioTunnelMode()
+        frame = np.zeros((120, 160, 3), dtype=np.uint8)
+        out = mode.render(frame, _empty_signals(frame_w=160, frame_h=120))
+        assert out.shape == frame.shape
+
+    def test_single_lane(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        mode = AudioTunnelMode(lane_count=1)
+        frame = _noise_frame()
+        out = mode.render(frame, _empty_signals())
+        assert out.shape == frame.shape
+
+    def test_max_lane_count(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        mode = AudioTunnelMode(lane_count=5)
+        frame = _noise_frame()
+        out = mode.render(frame, _empty_signals())
+        assert out.shape == frame.shape
+
+    def test_glow_disabled(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        mode = AudioTunnelMode(glow_strength=0.0)
+        frame = _noise_frame()
+        out = mode.render(frame, _empty_signals())
+        assert out.shape == frame.shape
+
+    def test_high_sensitivity(self) -> None:
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        mode = AudioTunnelMode(audio_sensitivity=3.0)
+        frame = _noise_frame()
+        sig = _audio_signals(audio_bass=0.5, audio_mid=0.5, audio_treble=0.5)
+        out = mode.render(frame, sig)
+        assert out.shape == frame.shape
+
+    def test_neon_color_helper(self) -> None:
+        from modes.audio_tunnel_mode import _neon_color
+        for t in [0.0, 0.25, 0.5, 0.75, 1.0]:
+            color = _neon_color(t)
+            assert len(color) == 3
+            for c in color:
+                assert 0 <= c <= 255
+
+    def test_in_registry(self) -> None:
+        from modes import MODES
+        assert "audio_tunnel" in MODES
+        from modes.audio_tunnel_mode import AudioTunnelMode
+        assert MODES["audio_tunnel"] is AudioTunnelMode
+
+
+# ---------------------------------------------------------------------------
 # Config integration
 # ---------------------------------------------------------------------------
 
@@ -464,6 +597,26 @@ class TestModeConfig:
         cfg = parse_args(["--no-geiss-plasma"])
         assert cfg.geiss_plasma_overlay is False
 
+    def test_parse_args_mode_audio_tunnel(self) -> None:
+        from config import parse_args
+        cfg = parse_args(["--mode", "audio_tunnel"])
+        assert cfg.default_mode == "audio_tunnel"
+
+    def test_parse_args_tunnel_speed(self) -> None:
+        from config import parse_args
+        cfg = parse_args(["--tunnel-speed", "2.5"])
+        assert cfg.tunnel_speed == pytest.approx(2.5)
+
+    def test_parse_args_tunnel_lane_count(self) -> None:
+        from config import parse_args
+        cfg = parse_args(["--tunnel-lane-count", "5"])
+        assert cfg.tunnel_lane_count == 5
+
+    def test_parse_args_tunnel_glow_strength(self) -> None:
+        from config import parse_args
+        cfg = parse_args(["--tunnel-glow-strength", "0.8"])
+        assert cfg.tunnel_glow_strength == pytest.approx(0.8)
+
     def test_json_config_mode_settings(self, tmp_path) -> None:
         import json
         from config import parse_args
@@ -481,3 +634,23 @@ class TestModeConfig:
         assert cfg.milkdrop_cycle_seconds == pytest.approx(20.0)
         assert cfg.geiss_use_symmetry is False
         assert cfg.geiss_plasma_overlay is False
+
+    def test_json_config_tunnel_settings(self, tmp_path) -> None:
+        import json
+        from config import parse_args
+        cfg_path = tmp_path / "test_tunnel_cfg.json"
+        cfg_path.write_text(json.dumps({
+            "default_mode": "audio_tunnel",
+            "tunnel_speed": 2.0,
+            "tunnel_obstacle_density": 1.5,
+            "tunnel_lane_count": 4,
+            "tunnel_audio_sensitivity": 1.2,
+            "tunnel_glow_strength": 0.7,
+        }))
+        cfg = parse_args(["--config", str(cfg_path)])
+        assert cfg.default_mode == "audio_tunnel"
+        assert cfg.tunnel_speed == pytest.approx(2.0)
+        assert cfg.tunnel_obstacle_density == pytest.approx(1.5)
+        assert cfg.tunnel_lane_count == 4
+        assert cfg.tunnel_audio_sensitivity == pytest.approx(1.2)
+        assert cfg.tunnel_glow_strength == pytest.approx(0.7)
