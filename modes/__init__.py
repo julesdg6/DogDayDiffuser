@@ -9,11 +9,13 @@ from typing import Dict, Type, Optional, Any
 from .base_mode import VisualMode
 from .geiss_mode import GeissMode
 from .milkdrop_mode import MilkDropMode, PRESET_NAMES
+from .audio_tunnel_mode import AudioTunnelMode
 
 # Mapping from CLI/config name to mode class
 MODES: Dict[str, Type[VisualMode]] = {
     "geiss": GeissMode,
     "milkdrop": MilkDropMode,
+    "audio_tunnel": AudioTunnelMode,
 }
 
 MODE_NAMES = list(MODES.keys())
@@ -86,6 +88,7 @@ __all__ = [
     "VisualMode",
     "GeissMode",
     "MilkDropMode",
+    "AudioTunnelMode",
     "MODES",
     "MODE_NAMES",
     "PRESET_NAMES",

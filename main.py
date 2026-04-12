@@ -16,6 +16,7 @@ Keyboard shortcuts:
   1–4       — select effect directly
   5         — switch to Geiss mode
   6         — switch to MilkDrop mode
+  7         — switch to Audio Tunnel mode
   space     — cycle to next effect
   g         — switch to Geiss mode
   m         — switch to MilkDrop mode
@@ -50,6 +51,7 @@ from effects.base import BaseEffect
 from modes import MODES, build_signals
 from modes.base_mode import VisualMode
 from modes.milkdrop_mode import MilkDropMode
+from modes.audio_tunnel_mode import AudioTunnelMode
 from renderer import Renderer
 from utils import FPSCounter, smooth
 from midi.mapping import MidiState
@@ -126,7 +128,14 @@ class DogDayDiffuser:
             allow_face_modulation=cfg.mode_allow_face_modulation,
             allow_audio_modulation=cfg.mode_allow_audio_modulation,
         )
-        return {"geiss": geiss, "milkdrop": milkdrop}
+        audio_tunnel = MODES["audio_tunnel"](
+            tunnel_speed=cfg.tunnel_speed,
+            obstacle_density=cfg.tunnel_obstacle_density,
+            lane_count=cfg.tunnel_lane_count,
+            audio_sensitivity=cfg.tunnel_audio_sensitivity,
+            glow_strength=cfg.tunnel_glow_strength,
+        )
+        return {"geiss": geiss, "milkdrop": milkdrop, "audio_tunnel": audio_tunnel}
 
     # ------------------------------------------------------------------
     # Property helpers
@@ -555,6 +564,11 @@ class DogDayDiffuser:
             self._mode = self._modes["milkdrop"]
             self._mode.reset()
             logger.info("Visual mode → MILKDROP")
+
+        elif key == ord("7"):
+            self._mode = self._modes["audio_tunnel"]
+            self._mode.reset()
+            logger.info("Visual mode → AUDIO TUNNEL")
 
         elif key == ord("g"):
             self._mode = self._modes["geiss"]
