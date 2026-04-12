@@ -54,6 +54,8 @@ _FOCAL_SCALE: float = 0.7  # focal_length = min(w,h) * _FOCAL_SCALE
 _TUNNEL_HW: float = 0.6    # tunnel half-width in world units
 _TUNNEL_HH: float = 0.45   # tunnel half-height in world units
 _MAX_BLOCKS: int = 40      # hard cap on live blocks (Pi-friendly)
+_MAX_SPARKLES: int = 60    # hard cap on live sparkle particles
+_AUDIO_HIST_SIZE: int = 8  # number of audio history samples to smooth over
 _TRAIL_DECAY: float = 0.65 # frame-to-frame darkening for trail effect
 
 
@@ -133,10 +135,9 @@ class AudioTunnelMode(VisualMode):
         self._sparkles: List[Dict[str, Any]] = []
 
         # Audio history buffer for smoothed spawn decisions
-        _HIST = 8
-        self._bass_hist: List[float] = [0.0] * _HIST
-        self._mid_hist: List[float] = [0.0] * _HIST
-        self._treble_hist: List[float] = [0.0] * _HIST
+        self._bass_hist: List[float] = [0.0] * _AUDIO_HIST_SIZE
+        self._mid_hist: List[float] = [0.0] * _AUDIO_HIST_SIZE
+        self._treble_hist: List[float] = [0.0] * _AUDIO_HIST_SIZE
 
         # Persistent dark canvas for trail/glow effect
         self._canvas: Optional[np.ndarray] = None
@@ -155,10 +156,9 @@ class AudioTunnelMode(VisualMode):
         self._ring_offsets = []
         self._blocks = []
         self._sparkles = []
-        _HIST = 8
-        self._bass_hist = [0.0] * _HIST
-        self._mid_hist = [0.0] * _HIST
-        self._treble_hist = [0.0] * _HIST
+        self._bass_hist = [0.0] * _AUDIO_HIST_SIZE
+        self._mid_hist = [0.0] * _AUDIO_HIST_SIZE
+        self._treble_hist = [0.0] * _AUDIO_HIST_SIZE
         self._canvas = None
         self._rng = random.Random(0)
 
@@ -316,8 +316,7 @@ class AudioTunnelMode(VisualMode):
         })
 
     def _spawn_sparkles(self, dt: float, treble: float, beat: float) -> None:
-        max_sparkles = 60
-        if len(self._sparkles) >= max_sparkles:
+        if len(self._sparkles) >= _MAX_SPARKLES:
             return
 
         avg_treble = sum(self._treble_hist) / len(self._treble_hist)
@@ -327,7 +326,7 @@ class AudioTunnelMode(VisualMode):
 
         n = int(rate * dt * 3)
         for _ in range(n):
-            if len(self._sparkles) >= max_sparkles:
+            if len(self._sparkles) >= _MAX_SPARKLES:
                 break
             wx = self._rng.uniform(-_TUNNEL_HW * 0.9, _TUNNEL_HW * 0.9)
             wy = self._rng.uniform(-_TUNNEL_HH * 0.9, _TUNNEL_HH * 0.9)
